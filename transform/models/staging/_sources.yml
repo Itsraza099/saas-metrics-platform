@@ -2,7 +2,9 @@ version: 2
 
 sources:
   - name: raw
-    description: Loaded as-is from the source system. Never edited by hand.
+    description: >
+      Loaded by saas_metrics.load from the source API. Append-only: one row per version of
+      each source record, keyed on (id, source_updated_at). Never edited by hand.
     schema: raw
     loaded_at_field: _loaded_at
     freshness:
@@ -10,5 +12,14 @@ sources:
       error_after: { count: 48, period: hour }
     tables:
       - name: customers
+        columns:
+          - name: id
+            data_tests: [not_null]
       - name: subscriptions
+        columns:
+          - name: id
+            data_tests: [not_null]
       - name: invoices
+        columns:
+          - name: id
+            data_tests: [not_null]

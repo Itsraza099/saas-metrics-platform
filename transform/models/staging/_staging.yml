@@ -2,23 +2,46 @@ version: 2
 
 models:
   - name: stg_customers
-    description: One row per customer.
+    description: "Current state of each customer. Grain: one row per customer."
     columns:
       - name: customer_id
         data_tests: [unique, not_null]
+      - name: country_code
+        data_tests: [not_null]
+
   - name: stg_subscriptions
-    description: One row per subscription.
+    description: "Current state of each subscription. Grain: one row per subscription."
     columns:
       - name: subscription_id
         data_tests: [unique, not_null]
       - name: customer_id
         data_tests:
-          - relationships: { to: ref('stg_customers'), field: customer_id }
+          - not_null
+          - relationships:
+              arguments: { to: ref('stg_customers'), field: customer_id }
+      - name: plan_name
+        data_tests:
+          - accepted_values:
+              arguments: { values: ["starter", "growth", "scale"] }
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments: { values: ["active", "cancelled"] }
+      - name: quantity
+        data_tests: [not_null]
+
   - name: stg_invoices
-    description: One row per monthly invoice.
+    description: "Current state of each invoice. Grain: one row per invoice."
     columns:
       - name: invoice_id
         data_tests: [unique, not_null]
+      - name: subscription_id
+        data_tests:
+          - relationships:
+              arguments: { to: ref('stg_subscriptions'), field: subscription_id }
       - name: status
         data_tests:
-          - accepted_values: { values: ["paid", "failed"] }
+          - accepted_values:
+              arguments: { values: ["paid", "failed", "uncollectible"] }
+      - name: amount_pence
+        data_tests: [not_null]

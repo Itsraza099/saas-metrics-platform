@@ -5,9 +5,30 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  PGHOST: localhost
+  PGPORT: "5432"
+  PGUSER: metrics
+  PGPASSWORD: metrics
+  PGDATABASE: metrics
+  REQUIRE_DB: "1"
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: metrics
+          POSTGRES_PASSWORD: metrics
+          POSTGRES_DB: metrics
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U metrics"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -18,5 +39,17 @@ jobs:
           uv run ruff format --check .
       - name: Type check
         run: uv run mypy
+      - name: Build dbt manifest
+        run: uv run dbt parse --project-dir transform --profiles-dir transform
       - name: Test
         run: uv run pytest
+      - name: End-to-end pipeline
+        # Simulate the company, load it incrementally twice (the second load must add
+        # nothing), then build and test every dbt model and check source freshness.
+        run: |
+          uv run python -m saas_metrics simulate --until 2025-11-30
+          uv run python -m saas_metrics load --in-process
+          uv run python -m saas_metrics load --in-process | tee second_load.txt
+          if grep -Ev "new +0 " second_load.txt; then echo "second load added rows"; exit 1; fi
+          uv run dbt build --project-dir transform --profiles-dir transform
+          uv run dbt source freshness --project-dir transform --profiles-dir transform

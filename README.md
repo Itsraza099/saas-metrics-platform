@@ -22,7 +22,7 @@ ARPA and cohort retention**.
 
 ```mermaid
 flowchart LR
-    G[Billing source<br/>synthetic SaaS company] --> API[Source API<br/>updated_since paging]
+    G[Billing system<br/>simulated SaaS company] --> API[Source API<br/>updated_since + cursor]
     API -->|incremental load,<br/>cursor per table| RAW[(raw)]
     RAW -->|dbt| STG[(staging)]
     STG -->|dbt| MARTS[(marts<br/>MRR · NRR · cohorts)]
@@ -32,19 +32,24 @@ flowchart LR
 
 | Layer | What happens | Example |
 |---|---|---|
-| `raw` | Loaded exactly as received, never edited | `raw.invoices` |
+| `raw` | Every version of every record, as received, never edited | `raw.invoices` |
 | `staging` | Renamed, typed, one model per source table, tested | `stg_invoices` |
 | `marts` | Facts and dimensions, each with a stated grain | `fct_mrr_monthly`: one row per customer per month |
 
 ## Engineering highlights
 
+- **Incremental, append-only loads.** Each run fetches only what changed since a stored
+  watermark, keeps every version of every record, and commits page by page, so re-runs add
+  nothing and a crash resumes where it stopped.
+  ([load.py](src/saas_metrics/load.py), [decision 0002](docs/decisions/0002-incremental-loading.md))
+- **A source that really changes.** A simulated billing system advances day by day, with
+  sign-ups, upgrades, churn, monthly invoices and failed payments that get retried, so the
+  pipeline is tested against realistic updates, not a static file.
 - **Every table states its grain** (what one row means), and its primary key is tested for
   uniqueness and nulls. ([staging tests](transform/models/staging/_staging.yml))
 - **Source freshness checks** warn after 24 hours without new data and fail after 48.
 - **Customer history is preserved** *(in progress)* with dbt snapshots (slowly changing
   dimension type 2), so last year's MRR still adds up after a customer changes plan.
-- **Deterministic source data.** The generator is seeded, so every test run and demo sees the
-  same company. ([generator](src/saas_metrics/generator.py))
 - **Why dbt + Dagster + Postgres** and not Airflow or DuckDB:
   [decision 0001](docs/decisions/0001-stack-and-layers.md).
 
@@ -52,17 +57,19 @@ flowchart LR
 
 | Break it on purpose | What catches it | Status |
 |---|---|---|
-| Run the same load twice | Row counts don't change (idempotent loads) | planned |
-| Insert a duplicate customer into `raw` | dbt `unique` test fails the run | test written |
+| Run the same load twice | Second run inserts 0 rows (checked in CI) | ✅ tested |
+| Network drops on page 3 of a load | Pages 1–2 kept; next run resumes, no duplicates | ✅ tested |
+| Plant a subscription with plan `enterprise` in `raw` | dbt `accepted_values` test fails the build | ✅ demonstrated |
 | Stop loading for two days | Source freshness check errors | check configured |
 | Rename a column upstream | Model contract fails before marts are touched | planned |
 
 ## Build progress
 
-- [x] Seeded billing data generator with grain tests
-- [x] dbt staging layer with tests and freshness checks
-- [x] Dagster project wired up, CI green
-- [ ] Source API with cursor-based incremental loads
+- [x] Simulated billing system and source API with cursor paging
+- [x] Incremental, append-only loader with watermarks and a run log
+- [x] dbt staging (latest version per record) with tests and freshness checks
+- [x] Dagster assets: loads linked to dbt models, daily schedule
+- [x] CI runs the whole pipeline against Postgres on every push
 - [ ] Marts: `fct_mrr_monthly`, `fct_revenue_kpis_monthly`, `fct_cohort_retention`, `dim_customers`
 - [ ] dbt docs and metrics dashboard published to GitHub Pages
 
@@ -84,7 +91,10 @@ Needs [uv](https://docs.astral.sh/uv/) and Docker.
 cp .env.example .env
 make install
 make db          # start Postgres
-make dbt-parse   # check the dbt project compiles
+make simulate DAYS=700   # build ~2 years of company history
+make pipeline    # incremental load, then dbt build + tests
+make simulate    # advance a month...
+make pipeline    # ...and load only what changed
 make dagster     # open http://localhost:3000
 make check       # lint, type check, tests
 ```

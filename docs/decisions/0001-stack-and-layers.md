@@ -8,8 +8,9 @@ The goal is a realistic ELT pipeline for SaaS revenue metrics that shows layered
 modelling, testing, incremental loading and orchestration.
 
 ## Decision
-- **Source:** a deterministic synthetic data generator, later served by a small API that
-  supports `updated_since` paging so incremental loads use a real cursor.
+- **Source:** a simulated billing system (SQLite) that advances one day at a time, served
+  by a small API with `updated_since` and cursor paging, so incremental loads have real
+  changes to pick up. Deterministic: seeded by date, so history is reproducible.
 - **Warehouse:** Postgres 16 (Docker locally).
 - **Layers:** `raw` (loaded as-is) → `staging` (renamed, typed, one model per source table)
   → `marts` (facts and dimensions with a stated grain).

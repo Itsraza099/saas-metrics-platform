@@ -1,6 +1,10 @@
+with latest as ({{ latest_version(source('raw', 'customers')) }})
+
 select
-    customer_id,
-    name as customer_name,
-    country as country_code,
-    created_at::date as created_at
-from {{ source('raw', 'customers') }}
+    payload ->> 'id' as customer_id,
+    payload ->> 'name' as customer_name,
+    payload ->> 'country' as country_code,
+    (payload ->> 'created_at')::timestamptz as created_at,
+    source_updated_at as updated_at,
+    _loaded_at
+from latest
