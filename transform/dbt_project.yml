@@ -1,0 +1,17 @@
+name: saas_metrics
+version: "0.1.0"
+config-version: 2
+profile: saas_metrics
+
+model-paths: ["models"]
+snapshot-paths: ["snapshots"]
+target-path: target
+
+models:
+  saas_metrics:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table

@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: One row per customer.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+  - name: stg_subscriptions
+    description: One row per subscription.
+    columns:
+      - name: subscription_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - relationships: { to: ref('stg_customers'), field: customer_id }
+  - name: stg_invoices
+    description: One row per monthly invoice.
+    columns:
+      - name: invoice_id
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - accepted_values: { values: ["paid", "failed"] }

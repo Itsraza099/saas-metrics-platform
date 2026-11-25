@@ -1,0 +1,42 @@
+[project]
+name = "saas-metrics-platform"
+version = "0.1.0"
+description = "ELT pipeline that turns SaaS billing data into MRR, ARR, NRR, GRR and cohort retention."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "dagster>=1.9",
+    "dagster-dbt>=0.25",
+    "dagster-webserver>=1.9",
+    "dbt-core>=1.9,<2",
+    "dbt-postgres>=1.9,<2",
+    "psycopg[binary]>=3.2",
+]
+
+[dependency-groups]
+dev = ["mypy>=1.11", "pytest>=8.0", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saas_metrics"]
+
+[tool.dagster]
+module_name = "saas_metrics.definitions"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["transform"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
